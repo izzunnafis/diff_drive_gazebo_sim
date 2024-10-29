@@ -1,0 +1,23 @@
+# FROM osrf/ros:iron-desktop-full
+# FROM izzunnafis/ros:iron-desktop-full-rev1
+
+# RUN apt-get update \
+#     && curl -sSL http://get.gazebosim.org | sh \
+#     && apt-get install -y ros-iron-gazebo-ros-pkgs \
+#     && rm -rf /var/lib/apt/lists/*
+
+#     #izzunnafis/ros:iron-desktop-gazebo-rev1
+
+# CMD ["/ros_entrypoint.sh bash"]
+
+# ============================== 
+FROM izzunnafis/ros:iron-desktop-full-rev1
+
+RUN apt-get update \
+    && apt install -y ros-iron-ros2-control ros-iron-ros2-controllers ros-iron-gazebo-ros2-control \
+    && rm -rf /var/lib/apt/lists/*
+
+CMD ["/ros_entrypoint.sh bash"]
+
+    #izzunnafis/ros:iron-desktop-gazebo-rev2
+# ==============================
