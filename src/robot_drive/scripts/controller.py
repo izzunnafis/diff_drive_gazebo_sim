@@ -88,12 +88,12 @@ class TeleopPublisher(Node):
         wheel_radius = 0.1  # Radius of the wheels
 
         # Calculate the wheel velocities
-        v_left = (2 * self.v - self.w * wheel_base) / (2 * wheel_radius) #inverse kinematics
-        v_right = (2 * self.v + self.w * wheel_base) / (2 * wheel_radius)
+        w_left = (2 * self.v - self.w * wheel_base) / (2 * wheel_radius) #to wheel angular vel
+        w_right = (2 * self.v + self.w * wheel_base) / (2 * wheel_radius)
         
         # Set the motor messages
-        self.left_motor_msg.data = [v_left]
-        self.right_motor_msg.data = [v_right]
+        self.left_motor_msg.data = [w_left]
+        self.right_motor_msg.data = [w_right]
         self.input_command_msg.linear.x = self.v
         self.input_command_msg.angular.z = self.w        
         
