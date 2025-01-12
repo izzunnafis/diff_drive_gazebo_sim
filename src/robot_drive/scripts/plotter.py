@@ -15,12 +15,12 @@ class VisualizationNode(Node):
         
         self.pose_command_x = 0.0
         self.pose_command_y = 0.0
-        self.pose_command_theta = 0.0
+        self.pose_command_theta = np.pi/2.0
         self.command_freq = 10.0
         
         self.pose_odom_x = 0.0
         self.pose_odom_y = 0.0
-        self.pose_odom_theta = 0.0
+        self.pose_odom_theta = np.pi/2.0
         self.odom_freq = 10.0
 
         self.create_subscription(Twist, '/input_commands', self.input_pose_callback, 10)
@@ -72,8 +72,8 @@ class VisualizationNode(Node):
         self.ax.set_ylabel('Y')
         self.ax.set_title('Command and Odometry Visualization')
         self.ax.grid(True)
-        self.ax.set_xlim(-20, 20)
-        self.ax.set_ylim(-20, 20)
+        self.ax.set_xlim(-15, 15)
+        self.ax.set_ylim(-15, 15)
         
         plt.draw()
         plt.pause(0.001)
