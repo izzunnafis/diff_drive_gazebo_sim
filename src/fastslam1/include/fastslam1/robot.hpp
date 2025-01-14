@@ -148,7 +148,7 @@ public:
                 }
             }
             
-            double distance = std::sqrt(std::pow(beam.back()[0] - x, 2) + std::pow(beam.back()[1] - y, 2));
+            double distance = std::sqrt(std::pow(beam.back()[0] - (x+150), 2) + std::pow(beam.back()[1] - (y+150), 2));
             if (distance < lidar_range * 10 - 5) {
                 occupy_grid.emplace_back(beam.back()[0], beam.back()[1]);
             }

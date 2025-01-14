@@ -2,9 +2,6 @@
 
 SlamNode::SlamNode() : Node("slam_node"), wheel_base(1.0), wheel_radius(0.1), odom_freq(10.0), step(0), update_time_count(0), move_forward(1) {
   double x = 0.0, y = 0.0, theta = 90.0;
-  pure_odom_x = x;
-  pure_odom_y = y;
-  pure_odom_theta = degree2radian(theta);
 
   v_odom = 0.0;
   w_odom = 0.0;
@@ -12,7 +9,6 @@ SlamNode::SlamNode() : Node("slam_node"), wheel_base(1.0), wheel_radius(0.1), od
   int grid_size = 30 * 10;
   cv::Mat world_grid(grid_size, grid_size, CV_64F, cv::Scalar(0.5));
   R = std::make_shared<Robot>(x, y, degree2radian(theta), world_grid);
-  estimated_R = R;
 
   NUMBER_OF_PARTICLES = 100;
   p.resize(NUMBER_OF_PARTICLES);
@@ -176,13 +172,6 @@ void SlamNode::odom_pose_update(const control_msgs::msg::DynamicJointState::Shar
 
   double update_freq = (update_time_count > 0.1) ? 1.0 / update_time_count : odom_freq;
 
-  pure_odom_theta += w_odom / update_freq;
-  pure_odom_x += v_odom / update_freq * std::cos(pose_odom_theta);
-  pure_odom_y += v_odom / update_freq * std::sin(pose_odom_theta);
-
-  pure_odom_theta = wrapAngle(pure_odom_theta);
-  odom.push_back({pure_odom_x, pure_odom_y});
-
   auto [x, y, theta] = R->get_state();
   theta += w_odom / update_freq;
   x += v_odom / update_freq * std::cos(theta) * 10.0;
@@ -191,13 +180,6 @@ void SlamNode::odom_pose_update(const control_msgs::msg::DynamicJointState::Shar
   R->set_states(x, y, theta);
   R->update_trajectory();
 
-  auto [x_est, y_est, theta_est] = estimated_R->get_state();
-  theta_est += w_odom / update_freq;
-  x_est += v_odom / update_freq * std::cos(theta_est) * 10.0;
-  y_est += v_odom / update_freq * std::sin(theta_est) * 10.0;
-
-  estimated_R->set_states(x_est, y_est, theta_est);
-  estimated_R->update_trajectory();
 }
 
 

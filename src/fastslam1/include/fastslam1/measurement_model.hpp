@@ -22,7 +22,7 @@ public:
             prob_hit[i] = normalDistribution(diff, std::pow(sigma_hit, 2));
 
             if (z_now_beam <= z_m[i]) {
-                prob_short[i] = eta_sort * lambda_short * std::exp(-lambda_short * z_m[i]);
+                prob_short[i] = eta_sort * lambda_short * std::exp(-lambda_short * z_now_beam);
             } else {
                 prob_short[i] = 0;
             }

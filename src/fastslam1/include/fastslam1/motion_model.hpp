@@ -7,7 +7,7 @@
 
 class MotionModel {
 public:
-    MotionModel() : alpha1(0.05), alpha2(0.001), alpha3(0.01), alpha4(0.01) {}
+    MotionModel() : alpha1(0.001), alpha2(0.001), alpha3(0.05), alpha4(0.05) {}
 
 
     std::tuple<double, double, double> sample_motion_model(const std::array<double, 3>& prev_odo, 
@@ -15,10 +15,10 @@ public:
                                                             const std::array<double, 3>& prev_pose, 
                                                             int move_forward) {
 
-        double rot1 = std::atan2(curr_odo[1] - prev_odo[1], curr_odo[0] - prev_odo[0]) - prev_odo[2];
-        rot1 = wrapAngle(rot1);
-        if(!move_forward) 
-            rot1 = wrapAngle(rot1 + M_PI);
+        // double rot1 = std::atan2(curr_odo[1] - prev_odo[1], curr_odo[0] - prev_odo[0]) - prev_odo[2];
+        // rot1 = wrapAngle(rot1);
+        // if(!move_forward) 
+        //     rot1 = wrapAngle(rot1 + M_PI);
         double rot1 = 0;
         double trans = std::sqrt(std::pow(curr_odo[0] - prev_odo[0], 2) + std::pow(curr_odo[1] - prev_odo[1], 2)) * move_forward;
         double rot2 = curr_odo[2] - prev_odo[2] - rot1;
