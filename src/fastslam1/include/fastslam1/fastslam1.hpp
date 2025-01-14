@@ -10,6 +10,7 @@
 #include <cmath>
 #include <algorithm>
 #include <memory>
+#include <ctime>
 
 #include "fastslam1/robot.hpp"
 #include "fastslam1/motion_model.hpp"
@@ -18,9 +19,12 @@
 
 #include "opencv4/opencv2/opencv.hpp"
 
+#include <omp.h>
+
 class SlamNode : public rclcpp::Node {
     public:
         SlamNode();
+        ~SlamNode();
 
     private:
         void scan_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg);
@@ -52,6 +56,11 @@ class SlamNode : public rclcpp::Node {
         std::array<double, 3> curr_odo;
         std::array<double, 3> prev_odo;
         std::vector<std::vector<double>> odom;
+
+        std::vector<double> temp_w;
+
+        std::chrono::milliseconds sum_duration_exec;
+        std::chrono::milliseconds sum_duration_iter;
 
         rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_subscription;
         rclcpp::Subscription<control_msgs::msg::DynamicJointState>::SharedPtr odom_subscription;

@@ -9,7 +9,6 @@
 // Bresenhams Line Generation Algorithm
 // ref: https://www.geeksforgeeks.org/bresenhams-line-generation-algorithm/
 
-
 std::vector<std::array<int, 2>> bresenham(int x1, int y1, int x2, int y2, int w, int h) {
     x1 = static_cast<int>(x1);
     y1 = static_cast<int>(y1);
@@ -60,7 +59,6 @@ std::vector<std::array<int, 2>> bresenham(int x1, int y1, int x2, int y2, int w,
 
     return loc;
 }
-
 
 inline double wrapAngle(double radian) {
     radian = radian - 2 * M_PI * std::floor((radian + M_PI) / (2 * M_PI));

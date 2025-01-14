@@ -14,7 +14,7 @@ SlamNode::SlamNode() : Node("slam_node"), wheel_base(1.0), wheel_radius(0.1), od
   R = std::make_shared<Robot>(x, y, degree2radian(theta), world_grid);
   estimated_R = R;
 
-  NUMBER_OF_PARTICLES = 8;
+  NUMBER_OF_PARTICLES = 100;
   p.resize(NUMBER_OF_PARTICLES);
   for (int i = 0; i < NUMBER_OF_PARTICLES; ++i) {
     p[i] = std::make_shared<Robot>(x, y, degree2radian(theta), world_grid);
@@ -25,81 +25,82 @@ SlamNode::SlamNode() : Node("slam_node"), wheel_base(1.0), wheel_radius(0.1), od
 
   curr_odo = R->get_state();
   prev_odo = R->get_state();
+  std::vector<double> temp_w(NUMBER_OF_PARTICLES, 0.0);
+
 
   scan_subscription = this->create_subscription<sensor_msgs::msg::LaserScan>(
-    "/scan", 5, std::bind(&SlamNode::scan_callback, this, std::placeholders::_1));
+    "/scan", 3, std::bind(&SlamNode::scan_callback, this, std::placeholders::_1));
   odom_subscription = this->create_subscription<control_msgs::msg::DynamicJointState>(
-    "/dynamic_joint_states", 5, std::bind(&SlamNode::odom_pose_update, this, std::placeholders::_1));
+    "/dynamic_joint_states", 3, std::bind(&SlamNode::odom_pose_update, this, std::placeholders::_1));
+}
+
+SlamNode::~SlamNode() {
+  auto avg_duration_exec = sum_duration_exec.count() / step;
+  auto avg_duration_iter = sum_duration_iter.count() / step;
+  std::cout << "Average execution time: " << avg_duration_exec << " milliseconds" << std::endl;
+  std::cout << "Average iteration time: " << avg_duration_iter << " milliseconds" << std::endl;
+
+  cv::Mat grid_image;
+  cv::Mat inverted_grid = 1 - estimated_R->get_grid();
+  cv::resize(inverted_grid, grid_image, cv::Size(600, 600));
+
+  grid_image.convertTo(grid_image, CV_8UC1, 255.0);
+  cv::cvtColor(grid_image, grid_image, cv::COLOR_GRAY2BGR);
+
+  std::vector<int> best_particles_indices(NUMBER_OF_PARTICLES);
+  std::iota(best_particles_indices.begin(), best_particles_indices.end(), 0);
+  // Corrected lambda to capture 'this'
+  std::sort(best_particles_indices.begin(), best_particles_indices.end(), [this](int i, int j) { 
+      return temp_w[i] > temp_w[j]; 
+  });
+  best_particles_indices.resize(5); // Keep only the 5 best particles
+
+  for (int i = 0; i < 5; ++i) {
+    cv::Mat particle_grid_image;
+    cv::Mat inverted_particle_grid = 1 - p[best_particles_indices[i]]->get_grid();
+    cv::resize(inverted_particle_grid, particle_grid_image, cv::Size(600, 600));
+
+    particle_grid_image.convertTo(particle_grid_image, CV_8UC1, 255.0);
+    cv::cvtColor(particle_grid_image, particle_grid_image, cv::COLOR_GRAY2BGR);
+
+    auto particle_state = p[best_particles_indices[i]]->get_state();
+    cv::circle(particle_grid_image, cv::Point(particle_state[0] * 2 + particle_grid_image.cols / 2, particle_state[1] * 2 + particle_grid_image.rows / 2), 2, cv::Scalar(255, 0, 0), -1);
+
+    auto particle_trajectory = p[best_particles_indices[i]]->get_trajectory();
+    for (const auto& point : particle_trajectory) {
+      cv::circle(particle_grid_image, cv::Point(point[0] * 2 + particle_grid_image.cols / 2, point[1] * 2 + particle_grid_image.rows / 2), 1, cv::Scalar(0, 255, 0), -1);
+    }
+
+    cv::flip(particle_grid_image, particle_grid_image, 0);
+    cv::imwrite("particle_" + std::to_string(best_particles_indices[i]) + ".png", particle_grid_image);
+  }
 }
 
 void SlamNode::scan_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg) {
-  if (abs(v_odom) < 0.001 && abs(w_odom) < 0.001) {
-    cv::Mat grid_image;
-    cv::Mat inverted_grid = 1 - estimated_R->get_grid();
-    cv::resize(inverted_grid, grid_image, cv::Size(600, 600));
-
-    grid_image.convertTo(grid_image, CV_8UC1, 255.0);
-    cv::cvtColor(grid_image, grid_image, cv::COLOR_GRAY2BGR);
-
-    for (const auto& particle : p) {
-      auto state = particle->get_state();
-      cv::circle(grid_image, cv::Point(state[0]*2 + grid_image.cols / 2, state[1]*2 + grid_image.rows / 2), 2, cv::Scalar(255, 0, 0), -1);
-    }
-
-    auto trajectory = estimated_R->get_trajectory();
-    for (const auto& point : trajectory) {
-      cv::circle(grid_image, cv::Point(point[0]*2 + grid_image.cols / 2, point[1]*2 + grid_image.rows / 2), 1, cv::Scalar(0, 255, 0), -1);
-    }
-
-    cv::flip(grid_image, grid_image, 0);
-    cv::imshow("Occupancy Grid", grid_image);
-    cv::waitKey(1);
-    return;
-  }
-
   auto time_start = std::chrono::high_resolution_clock::now();
   curr_odo = R->get_state();
-
-  auto [z_star, free_grid_star, occupy_grid_star] = R->process_beam(msg->ranges);
-  Eigen::Vector3d curr_odo_eigen = Eigen::Vector3d(curr_odo[0], curr_odo[1], curr_odo[2]);
-  
-  auto free_grid_star_offset = free_grid_star;
-  for (std::size_t i=0; i<free_grid_star.size(); i++) {
-    free_grid_star_offset[i] = absolute2relative(free_grid_star[i], curr_odo_eigen);
-  }
-
-  auto occupy_grid_star_offset = occupy_grid_star;
-  for (std::size_t i=0; i<occupy_grid_star.size(); i++) {
-    occupy_grid_star_offset[i] = absolute2relative(occupy_grid_star[i], curr_odo_eigen);
-  }
   
   std::vector<double> w(NUMBER_OF_PARTICLES, 0.0);
 
-
+  auto start_time_exec = std::chrono::high_resolution_clock::now();
+  #pragma omp parallel for// default(none) shared(p, msg, z_star, free_grid_star_offset, occupy_grid_star_offset, w, curr_odo, prev_odo, move_forward)
   for (int i = 0; i < NUMBER_OF_PARTICLES; ++i) {
     auto prev_pose = p[i]->get_state();
     auto [x, y, theta] = motion_model->sample_motion_model(prev_odo, curr_odo, prev_pose, move_forward); //Motion model
-    p[i]->set_states(x, y, theta);
+    p[i]->set_states(x, y, theta); //set to x_t
     p[i]->update_trajectory();
 
-    auto [z, _, __] = p[i]->process_beam(msg->ranges);
-    w[i] = measurement_model->measurement_model(z_star, z); //Measurement model
+    auto z = p[i]->sense_beam(); //get the z from m_(-1) on pos x_t
+    w[i] = measurement_model->measurement_model(msg->ranges, z); //Measurement model
 
-    auto curr_pose = p[i]->get_state();
-    auto curr_pose_eigen = Eigen::Vector3d(curr_pose[0], curr_pose[1], curr_pose[2]);
-
-    auto free_grid = free_grid_star_offset;
-    for (std::size_t j=0; j<free_grid_star_offset.size(); j++) {
-      free_grid[j] = relative2absolute(free_grid_star_offset[j], curr_pose_eigen);
-    }
-
-    auto occupy_grid = occupy_grid_star_offset;
-    for (std::size_t j=0; j<occupy_grid_star_offset.size(); j++) {
-      occupy_grid[j] = relative2absolute(occupy_grid_star_offset[j], curr_pose_eigen);
-    }
+    auto [free_grid, occupy_grid] = p[i]->process_beam(msg->ranges); //Ray casting process
 
     p[i]->update_occupancy_grid(free_grid, occupy_grid); //Update occupancy grid
   }
+  auto end_time_exec = std::chrono::high_resolution_clock::now();
+  auto duration_exec = std::chrono::duration_cast<std::chrono::milliseconds>(end_time_exec - start_time_exec);
+  sum_duration_exec += duration_exec;
+  std::cout << "Execution time: " << duration_exec.count() << " milliseconds" << std::endl;
 
   double sum_w = std::accumulate(w.begin(), w.end(), 0.0);
   std::transform(w.begin(), w.end(), w.begin(), [sum_w](double weight) { return weight / sum_w; });
@@ -107,7 +108,8 @@ void SlamNode::scan_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg) {
   int best_id = std::distance(w.begin(), std::max_element(w.begin(), w.end()));
   estimated_R = std::make_shared<Robot>(*p[best_id]);
 
-  std::vector<std::shared_ptr<Robot>> new_p(NUMBER_OF_PARTICLES);
+  std::vector<std::shared_ptr<Robot>> new_p = p;
+    
   double J_inv = 1.0 / NUMBER_OF_PARTICLES;
   double r = static_cast<double>(rand()) / RAND_MAX * J_inv;
   double c = w[0];
@@ -119,8 +121,13 @@ void SlamNode::scan_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg) {
       ++i;
       c += w[i];
     }
-    new_p[j] = std::make_shared<Robot>(*p[i]);
+    new_p[j]->x = p[i]->x;
+    new_p[j]->y = p[i]->y;
+    new_p[j]->theta = p[i]->theta;
   }
+
+  p = new_p;
+  temp_w = w;
 
   prev_odo = curr_odo;
 
@@ -147,11 +154,10 @@ void SlamNode::scan_callback(const sensor_msgs::msg::LaserScan::SharedPtr msg) {
   cv::imshow("Occupancy Grid", grid_image);
   cv::waitKey(1);
   
-  p = new_p;
-
   auto time_end = std::chrono::high_resolution_clock::now();
-  update_time_count = std::chrono::duration<double>(time_end - time_start).count();
-  std::cout << "Update time: " << update_time_count << std::endl;
+  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start);
+  sum_duration_iter += duration;
+  std::cout << "Iteration time: " << duration.count() << " milliseconds" << std::endl;
 }
 
 void SlamNode::odom_pose_update(const control_msgs::msg::DynamicJointState::SharedPtr msg) {

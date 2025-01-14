@@ -7,23 +7,28 @@
 
 class MotionModel {
 public:
-    MotionModel() : alpha1(0.01), alpha2(0.01), alpha3(0.02), alpha4(0.02) {}
+    MotionModel() : alpha1(0.05), alpha2(0.001), alpha3(0.01), alpha4(0.01) {}
+
 
     std::tuple<double, double, double> sample_motion_model(const std::array<double, 3>& prev_odo, 
                                                             const std::array<double, 3>& curr_odo,  
                                                             const std::array<double, 3>& prev_pose, 
                                                             int move_forward) {
 
-        double rot1 = 0; //assume that rot0 is always zero
+        double rot1 = std::atan2(curr_odo[1] - prev_odo[1], curr_odo[0] - prev_odo[0]) - prev_odo[2];
+        rot1 = wrapAngle(rot1);
+        if(!move_forward) 
+            rot1 = wrapAngle(rot1 + M_PI);
+        double rot1 = 0;
         double trans = std::sqrt(std::pow(curr_odo[0] - prev_odo[0], 2) + std::pow(curr_odo[1] - prev_odo[1], 2)) * move_forward;
         double rot2 = curr_odo[2] - prev_odo[2] - rot1;
         rot2 = wrapAngle(rot2);
 
-        rot1 = rot1 - normalDistributionGen(0, alpha1 * std::pow(rot1*10, 2) + alpha2 * std::pow(trans, 2));
+        rot1 = rot1 - normalDistributionGen(0, alpha1 * std::pow(rot1, 2) + alpha2 * std::pow(trans, 2));
         rot1 = wrapAngle(rot1);
-        trans = trans - normalDistributionGen(0, alpha3 * std::pow(trans, 2) + alpha4 * (std::pow(rot1*10, 2) 
-                + std::pow(rot2*10, 2)));
-        rot2 = rot2 - normalDistributionGen(0, alpha1 * std::pow(rot2*10, 2) + alpha2 * std::pow(trans, 2));
+        trans = trans - normalDistributionGen(0, alpha3 * std::pow(trans, 2) + alpha4 * (std::pow(rot1, 2) 
+                + std::pow(rot2, 2)));
+        rot2 = rot2 - normalDistributionGen(0, alpha1 * std::pow(rot2, 2) + alpha2 * std::pow(trans, 2));
         rot2 = wrapAngle(rot2);
 
         double x = prev_pose[0] + trans * std::cos(prev_pose[2] + rot1);
